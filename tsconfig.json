@@ -1,11 +1,10 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "_comment": [
-    "Self-contained on purpose — the contents of @repo/typescript-config/base.json",
-    "are inlined rather than extended. This app is mirrored verbatim to the public",
-    "github.com/ojodotso/mcp-server repo, which has no workspace to resolve",
-    "@repo/* from, so an `extends` there would not build. Same reasoning as the",
-    "`root: true` in .eslintrc.cjs. Keep in sync with base.json when it changes."
+    "Self-contained on purpose: this package must build on its own, outside any",
+    "workspace, so the shared base config is inlined rather than extended —",
+    "`@repo/*` would not resolve. Same reasoning as `root: true` in .eslintrc.cjs.",
+    "Keep in sync with packages/typescript-config/base.json when that changes."
   ],
   "compilerOptions": {
     "declaration": true,

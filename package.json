@@ -1,0 +1,65 @@
+{
+  "name": "@ojodotso/mcp-server",
+  "version": "0.3.1",
+  "mcpName": "so.ojo/mcp-server",
+  "description": "MCP server for oJo — let AI agents turn HTML into images. Free live previews with no account; add an oJo API key for hosted PNG URLs and templates.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ojo",
+    "screenshot",
+    "image-generation",
+    "html-to-image",
+    "ai",
+    "agent"
+  ],
+  "license": "MIT",
+  "author": "oJo",
+  "homepage": "https://ojo.so/docs/mcp-server",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ojodotso/mcp-server.git"
+  },
+  "bugs": "https://github.com/ojodotso/mcp-server/issues",
+  "type": "module",
+  "bin": {
+    "ojo-mcp": "build/index.js"
+  },
+  "files": [
+    "build",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "tsx watch ./src/index.ts",
+    "build": "tsc",
+    "start": "node build/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
+    "depcheck": "depcheck",
+    "check": "tsc --noEmit -p tsconfig.test.json",
+    "prepublishOnly": "pnpm run build",
+    "release": "node scripts/publish.mjs",
+    "release:dry": "node scripts/publish.mjs --dry-run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "dotenv": "^16.4.5",
+    "sharp": "^0.34.5",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.4",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.1",
+    "tsx": "^4.22.4",
+    "typescript": "^5.3.3",
+    "vitest": "^3.2.6"
+  }
+}

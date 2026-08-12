@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "_comment": [
+    "Self-contained on purpose — the contents of @repo/typescript-config/base.json",
+    "are inlined rather than extended. This app is mirrored verbatim to the public",
+    "github.com/ojodotso/mcp-server repo, which has no workspace to resolve",
+    "@repo/* from, so an `extends` there would not build. Same reasoning as the",
+    "`root: true` in .eslintrc.cjs. Keep in sync with base.json when it changes."
+  ],
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "esModuleInterop": true,
+    "incremental": false,
+    "isolatedModules": true,
+    "lib": ["es2022", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleDetection": "force",
+    "moduleResolution": "NodeNext",
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022",
+    "rootDir": "./src",
+    "outDir": "./build"
+  },
+  "include": ["src"],
+  "exclude": ["build", "node_modules"]
+}

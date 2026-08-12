@@ -92,33 +92,11 @@ viewport conventions, and the preview-first design loop.
   `create_preview_link`. Defaults to `https://ojo.so`; point it at a local
   `http://localhost:3000` when developing against a self-hosted web app.
 
-## Source
-
-This package is developed in oJo's private monorepo and mirrored to
-[github.com/ojodotso/mcp-server](https://github.com/ojodotso/mcp-server) on every
-release, so the code that runs on your machine can be read before you run it. The
-mirror carries one snapshot commit per version rather than the monorepo's history.
-
-## Develop (from the monorepo)
+## Develop
 
 ```bash
-pnpm --filter @ojodotso/mcp-server build
-pnpm --filter @ojodotso/mcp-server test
-pnpm --filter @ojodotso/mcp-server check
+pnpm install
+pnpm build
+pnpm test
+pnpm check
 ```
-
-### Release
-
-This package is published by hand — the monorepo's semantic-release cuts GitHub
-releases only. From `apps/mcp-server`:
-
-```bash
-pnpm release:dry              # run every pre-flight check, publish nothing
-pnpm release --otp=123456     # publish (the npm account has publish-2FA)
-```
-
-Bump `version` in `package.json` **and** the handshake version in
-`src/server/index.ts` together — a test pins them to each other. The pre-flight
-refuses to reuse a published version (npm metadata is immutable), verifies the
-shipping files match `origin/master`, and inspects the built artifact's actual
-tool surface rather than trusting the source.

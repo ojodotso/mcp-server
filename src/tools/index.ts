@@ -5,6 +5,8 @@ import {
   createTemplateSchema,
   generateImageFromHtmlSchema,
   generateImageFromTemplateSchema,
+  generatePdfFromHtmlSchema,
+  generatePdfFromTemplateSchema,
   getTemplateSchema,
   listTemplatesSchema,
 } from './schema.js';
@@ -12,6 +14,10 @@ import {
   makeGenerateImageFromHtml,
   makeGenerateImageFromTemplate,
 } from './handlers/image-handlers.js';
+import {
+  makeGeneratePdfFromHtml,
+  makeGeneratePdfFromTemplate,
+} from './handlers/pdf-handlers.js';
 import {
   makeCreateTemplate,
   makeGetTemplate,
@@ -95,6 +101,37 @@ export function registerTools(
       inputSchema: generateImageFromTemplateSchema,
     },
     makeGenerateImageFromTemplate(client)
+  );
+
+  server.registerTool(
+    'generate_pdf_from_html',
+    {
+      title: 'Generate PDF from HTML',
+      description:
+        'Render plain HTML (with inline CSS) into a PDF document and return its ' +
+        'public URL and page count. COSTS 1 CREDIT per PDF of up to 20 pages. A ' +
+        'longer document is refused and costs nothing. Pages are A4 unless the HTML ' +
+        'sets a CSS `@page` rule (size, margin). Content flows onto further pages, ' +
+        'and `break-before: page` starts a new one. `create_preview_link` shows the ' +
+        'screen rendering for free, not the page breaks.',
+      inputSchema: generatePdfFromHtmlSchema,
+    },
+    makeGeneratePdfFromHtml(client)
+  );
+
+  server.registerTool(
+    'generate_pdf_from_template',
+    {
+      title: 'Generate PDF from template',
+      description:
+        'Render an existing oJo template into a PDF document, optionally ' +
+        'overriding its variables via `modify`, and return its public URL and page ' +
+        'count. COSTS 1 CREDIT per PDF of up to 20 pages. A longer document is ' +
+        'refused and costs nothing. Pages are A4 unless the template sets a CSS ' +
+        '`@page` rule, which may use a variable such as `size: {{pageSize}}`.',
+      inputSchema: generatePdfFromTemplateSchema,
+    },
+    makeGeneratePdfFromTemplate(client)
   );
 
   server.registerTool(

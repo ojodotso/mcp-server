@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { gunzipSync } from 'node:zlib';
+import { randomBytes } from 'node:crypto';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { OjoApiClient } from '../../src/server/ojo-client.js';
 import { OjoApiError } from '../../src/server/ojo-client.js';
@@ -250,5 +251,33 @@ describe('preview handler', () => {
       gunzipSync(Buffer.from(match![1]!, 'base64url')).toString('utf-8')
     );
     expect(decoded).toEqual({ content: '<p>x</p>' });
+  });
+
+  it('refuses a draft whose encoded link would exceed the size limit', async () => {
+    const handler = makeCreatePreviewLink('https://ojo.so');
+
+    // Incompressible, the way an inlined data: URI behaves — this is the case
+    // the limit exists for. Compressible markup of the same length would pass.
+    const inlined = randomBytes(32 * 1024).toString('base64');
+    const result = await handler({
+      html: `<img src="data:image/png;base64,${inlined}">`,
+    });
+
+    expect(firstText(result)).not.toContain('/preview#draft=');
+    expect(firstText(result)).toContain('over the 16 KB limit');
+    expect(firstText(result)).toContain('https');
+  });
+
+  it('still allows text-heavy markup far larger than the link limit', async () => {
+    const handler = makeCreatePreviewLink('https://ojo.so');
+
+    // The negative arm of the test above: ~40 KB of compressible HTML must NOT
+    // trip the limit, or the guard would be rejecting ordinary drafts.
+    const result = await handler({
+      html: `<ul>${'<li class="row">metric</li>'.repeat(1600)}</ul>`,
+    });
+
+    expect(firstText(result)).toContain('/preview#draft=');
+    expect(firstText(result)).not.toContain('too large');
   });
 });

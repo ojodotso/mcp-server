@@ -1,8 +1,8 @@
 {
   "name": "@ojodotso/mcp-server",
-  "version": "0.3.1",
+  "version": "0.5.0",
   "mcpName": "so.ojo/mcp-server",
-  "description": "MCP server for oJo — let AI agents turn HTML into images. Free live previews with no account; add an oJo API key for hosted PNG URLs and templates.",
+  "description": "MCP server for oJo — let AI agents turn HTML into images and PDFs. Free live previews with no account; add an oJo API key for hosted PNG and PDF URLs and templates.",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -51,7 +51,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
     "dotenv": "^16.4.5",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.4",
     "zod": "^3.22.4"
   },
   "devDependencies": {

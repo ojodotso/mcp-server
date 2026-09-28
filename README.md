@@ -1,9 +1,9 @@
 # @ojodotso/mcp-server
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that lets an
-AI agent turn HTML into images. Live previews are free and need no account; an
-oJo API key adds hosted PNG URLs and reusable templates through the user's own
-account. Transport is local **stdio**; the API boundary is HTTP to
+AI agent turn HTML into images and PDFs. Live previews are free and need no
+account; an oJo API key adds hosted PNG and PDF URLs and reusable templates
+through the user's own account. Transport is local **stdio**; the API boundary is HTTP to
 `https://api.ojo.so/v1` only.
 
 ## Quick start — no account needed
@@ -29,7 +29,7 @@ claude mcp add ojo -- npx -y @ojodotso/mcp-server
 
 ### Adding a key
 
-A key unlocks the permanent PNG URL — the thing you can put in an email, a
+A key unlocks the permanent PNG or PDF URL — the thing you can put in an email, a
 social card or an API response — plus reusable templates. Create one at
 <https://ojo.so/dashboard/api> and pass it as `OJO_API_KEY`:
 
@@ -61,6 +61,8 @@ the oJo API, so advertising them keyless would offer tools that can only fail.
 | `create_preview_link` | Build a free, full-resolution `/preview` link for an HTML/Handlebars draft. | — | no |
 | `generate_image_from_html` | Render plain HTML (with inline CSS) to a PNG; returns its public URL. | 1 | yes |
 | `generate_image_from_template` | Render an existing template, optionally overriding variables via `modify`. | 1 | yes |
+| `generate_pdf_from_html` | Render plain HTML (with inline CSS) to a PDF of up to 20 pages, A4 unless a CSS `@page` rule sets the size; returns its public URL and page count. A longer document is refused and costs nothing. | 1 | yes |
+| `generate_pdf_from_template` | Render an existing template to a PDF, optionally overriding variables via `modify`. | 1 | yes |
 | `list_templates` | List the templates available to the account. | — | yes |
 | `get_template` | Fetch one template's decoded HTML and variable defaults. | — | yes |
 | `create_template` | Create a reusable template from plain HTML/Handlebars. | — | yes |
@@ -71,9 +73,10 @@ Iterate with `create_preview_link`, then render. It returns an
 `https://ojo.so/preview#draft=…` URL that renders the draft live in the browser
 through the **same engine as the final PNG**, at full resolution. The draft is
 gzipped into the URL *hash*, so it never reaches a server and nothing is stored
-— the link is self-contained and shareable with a human reviewer.
+— the link is self-contained and shareable with a human reviewer. For a PDF the
+preview shows the screen rendering, not the page breaks.
 
-Both generate tools also accept `inspect: true`, which returns a 512px-wide
+Both image tools also accept `inspect: true`, which returns a 512px-wide
 downscaled thumbnail alongside the URL. That is a confirmation that the render
 succeeded, not a design surface — it is too small to judge layout or typography.
 

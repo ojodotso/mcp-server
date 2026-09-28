@@ -18,7 +18,7 @@ async function connect(client_: OjoApiClient | null = {} as OjoApiClient) {
 }
 
 describe('MCP server registration', () => {
-  it('registers exactly the v1 tool surface', async () => {
+  it('registers exactly the tool surface, the two PDF tools included', async () => {
     const client = await connect();
 
     const { tools } = await client.listTools();
@@ -29,9 +29,32 @@ describe('MCP server registration', () => {
       'create_template',
       'generate_image_from_html',
       'generate_image_from_template',
+      'generate_pdf_from_html',
+      'generate_pdf_from_template',
       'get_template',
       'list_templates',
     ]);
+
+    await client.close();
+  });
+
+  it('leaves the input schemas of the six pre-PDF tools unchanged', async () => {
+    // Pinned from the tool surface as it stood before the PDF tools were added.
+    const expected = JSON.parse(
+      readFileSync(
+        new URL('../fixtures/existing-tool-input-schemas.json', import.meta.url),
+        'utf-8'
+      )
+    ) as Record<string, unknown>;
+    const client = await connect();
+
+    const { tools } = await client.listTools();
+    const byName = new Map(tools.map((t) => [t.name, t.inputSchema]));
+
+    expect(Object.keys(expected)).toHaveLength(6);
+    for (const [name, schema] of Object.entries(expected)) {
+      expect(byName.get(name), name).toEqual(schema);
+    }
 
     await client.close();
   });

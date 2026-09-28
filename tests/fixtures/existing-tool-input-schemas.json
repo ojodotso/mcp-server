@@ -1,0 +1,158 @@
+{
+  "create_preview_link": {
+    "type": "object",
+    "properties": {
+      "html": {
+        "type": "string",
+        "description": "Plain HTML/Handlebars to preview, using {{variable}} placeholders. Do NOT base64-encode it. The markup must be self-contained: reference images, fonts and scripts by public https URL, or inline small ones as data: URIs. A local or relative path (./logo.png, /home/..., file://...) renders blank — nothing that renders this HTML can read your filesystem. Prefer https URLs over inlining here: the whole draft is compressed into the link, and a data: URI does not compress, so an inlined asset costs its full size in the URL while text-heavy markup costs about a quarter of it."
+      },
+      "variables": {
+        "type": "object",
+        "additionalProperties": {},
+        "description": "Modify Payload: values to fill the placeholders for this preview render."
+      },
+      "viewportWidth": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "description": "Viewport width in pixels (default 1280)."
+      },
+      "viewportHeight": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "description": "Viewport height in pixels (default 800)."
+      }
+    },
+    "required": [
+      "html"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "create_template": {
+    "type": "object",
+    "properties": {
+      "html": {
+        "type": "string",
+        "description": "Plain HTML/Handlebars for the template, using {{variable}} placeholders. Do NOT base64-encode it. The markup must be self-contained: reference images, fonts and scripts by public https URL, or inline small ones as data: URIs. A local or relative path (./logo.png, /home/..., file://...) renders blank — nothing that renders this HTML can read your filesystem."
+      },
+      "variables": {
+        "type": "object",
+        "additionalProperties": {},
+        "description": "Template Variables: the default values/shape for the template placeholders (the schema, not per-render data)."
+      }
+    },
+    "required": [
+      "html"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "generate_image_from_html": {
+    "type": "object",
+    "properties": {
+      "html": {
+        "type": "string",
+        "description": "Plain HTML (with inline CSS) to render into an image. Do NOT base64-encode it. The markup must be self-contained: reference images, fonts and scripts by public https URL, or inline small ones as data: URIs. A local or relative path (./logo.png, /home/..., file://...) renders blank — nothing that renders this HTML can read your filesystem."
+      },
+      "viewportWidth": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "description": "Viewport width in pixels (default 1280)."
+      },
+      "viewportHeight": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "description": "Viewport height in pixels (default 800)."
+      },
+      "transparentBackground": {
+        "type": "boolean",
+        "description": "Render with a transparent background instead of white."
+      },
+      "inspect": {
+        "type": "boolean",
+        "description": "When true, also return a small downscaled preview image of the result so you can see it and iterate."
+      }
+    },
+    "required": [
+      "html"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "generate_image_from_template": {
+    "type": "object",
+    "properties": {
+      "templateId": {
+        "type": "string",
+        "description": "Id of an existing oJo template (from list_templates)."
+      },
+      "modify": {
+        "type": "object",
+        "additionalProperties": {},
+        "description": "Modify Payload: per-render values that override the template variable defaults (merged over the defaults)."
+      },
+      "viewportWidth": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "description": "Viewport width in pixels (default 1280)."
+      },
+      "viewportHeight": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "description": "Viewport height in pixels (default 800)."
+      },
+      "transparentBackground": {
+        "type": "boolean",
+        "description": "Render with a transparent background instead of white."
+      },
+      "inspect": {
+        "type": "boolean",
+        "description": "When true, also return a small downscaled preview image of the result so you can see it and iterate."
+      }
+    },
+    "required": [
+      "templateId"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_template": {
+    "type": "object",
+    "properties": {
+      "templateId": {
+        "type": "string",
+        "description": "Id of the template to fetch."
+      }
+    },
+    "required": [
+      "templateId"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "list_templates": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "description": "1-based page number (default 1)."
+      },
+      "pageSize": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "description": "Number of templates per page (default 10)."
+      },
+      "sort": {
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "description": "Sort by creation time, ascending or descending (default desc)."
+      }
+    },
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

@@ -18,6 +18,13 @@ export interface GeneratedImage {
   createdAt?: string;
 }
 
+export interface GeneratedPdf {
+  id: string;
+  pdfUrl: string;
+  pages: number;
+  createdAt?: string;
+}
+
 export interface ListTemplatesParams {
   page?: number;
   pageSize?: number;
@@ -128,6 +135,29 @@ export class OjoApiClient {
       body: JSON.stringify(body),
     });
     return { ...result, imageUrl: toAbsoluteUrl(result.imageUrl) };
+  }
+
+  /** POST /pdf/html — render raw HTML into a PDF. Same exact `text/html` rule as /image/html. */
+  async createPdfFromHtml(html: string): Promise<GeneratedPdf> {
+    const result = await this.request<GeneratedPdf>('/pdf/html', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/html' },
+      body: html,
+    });
+    return { ...result, pdfUrl: toAbsoluteUrl(result.pdfUrl) };
+  }
+
+  /** POST /pdf/template — render an existing template into a PDF. */
+  async createPdfFromTemplate(
+    templateId: string,
+    modify: Record<string, unknown> = {}
+  ): Promise<GeneratedPdf> {
+    const result = await this.request<GeneratedPdf>('/pdf/template', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ templateId, modify }),
+    });
+    return { ...result, pdfUrl: toAbsoluteUrl(result.pdfUrl) };
   }
 
   /** GET /template — list the templates available to this account. */

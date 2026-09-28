@@ -19,7 +19,7 @@ export function createServer(
     name: 'ojo',
     // Keep in sync with package.json — this is what clients see in the MCP
     // handshake. It drifted to a stale 0.1.0 once; bump both together.
-    version: '0.3.1',
+    version: '0.5.0',
   });
   registerTools(server, client, webBaseUrl);
   registerPrompts(server, client !== null);

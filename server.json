@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "so.ojo/mcp-server",
-  "title": "oJo — HTML to image",
+  "title": "oJo — HTML to image and PDF",
   "description": "Render HTML or templates to a hosted PNG or PDF, in one response. Free previews need no API key.",
   "version": "0.5.0",
   "websiteUrl": "https://ojo.so/docs/mcp-server",

@@ -1,8 +1,8 @@
 {
   "name": "@ojodotso/mcp-server",
-  "version": "0.5.0",
+  "version": "0.8.0",
   "mcpName": "so.ojo/mcp-server",
-  "description": "MCP server for oJo — let AI agents turn HTML into images and PDFs. Free live previews with no account; add an oJo API key for hosted PNG and PDF URLs and templates.",
+  "description": "oJo turns an HTML template and your JSON data into a PDF or PNG at a hosted link, from the REST API, any MCP client or the editor.",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -41,25 +41,30 @@
     "start": "node build/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
+    "lint": "eslint . --max-warnings 0",
     "depcheck": "depcheck",
     "check": "tsc --noEmit -p tsconfig.test.json",
     "prepublishOnly": "pnpm run build",
     "release": "node scripts/publish.mjs",
-    "release:dry": "node scripts/publish.mjs --dry-run"
+    "release:dry": "node scripts/publish.mjs --dry-run",
+    "release:registry": "node scripts/publish.mjs --registry-only"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.2",
-    "dotenv": "^16.4.5",
-    "sharp": "^0.35.4",
-    "zod": "^3.22.4"
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
+    "jose": "^6.2.12",
+    "sharp": "^0.35.5",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/node": "^22.16.4",
-    "@typescript-eslint/parser": "^6.21.0",
-    "eslint": "^8.57.1",
-    "tsx": "^4.22.4",
-    "typescript": "^5.3.3",
-    "vitest": "^3.2.6"
+    "@eslint/js": "^9.39.5",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.20.5",
+    "@typescript-eslint/parser": "^8.71.2",
+    "eslint": "^9.39.5",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "vitest": "^3.2.7"
   }
 }

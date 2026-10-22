@@ -3,6 +3,7 @@ import type {
   CreateTemplateArgs,
   GetTemplateArgs,
   ListTemplatesArgs,
+  UpdateTemplateArgs,
 } from '../schema.js';
 import { textResult, toErrorResult } from '../result.js';
 
@@ -32,6 +33,17 @@ export function makeCreateTemplate(client: OjoApiClient) {
   return async (args: CreateTemplateArgs) => {
     try {
       const result = await client.createTemplate(args.html, args.variables);
+      return textResult(JSON.stringify(result, null, 2));
+    } catch (error) {
+      return toErrorResult(error);
+    }
+  };
+}
+
+export function makeUpdateTemplate(client: OjoApiClient) {
+  return async (args: UpdateTemplateArgs) => {
+    try {
+      const result = await client.updateTemplate(args.templateId, args.html, args.variables);
       return textResult(JSON.stringify(result, null, 2));
     } catch (error) {
       return toErrorResult(error);

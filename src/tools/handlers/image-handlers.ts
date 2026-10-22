@@ -71,5 +71,6 @@ function formatImage(image: GeneratedImage): string {
     'Image generated successfully.',
     `id: ${image.id}`,
     `url: ${image.imageUrl}`,
+    ...(image.warnings ?? []).map((warning) => `warning: ${warning}`),
   ].join('\n');
 }

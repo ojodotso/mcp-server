@@ -181,12 +181,15 @@ describe('generate_pdf_from_template', () => {
     vi.unstubAllGlobals();
   });
 
-  it('takes a required templateId and an optional modify, shaped like generate_image_from_template', async () => {
+  it('takes an optional templateId, an optional modify and an optional pages, templateId and modify shaped like generate_image_from_template', async () => {
+    // AC58: templateId became optional, since every entry of pages may name
+    // its own template or give HTML.
     const { tools } = await client.listTools();
     const pdf = toolNamed(tools, 'generate_pdf_from_template').inputSchema;
     const image = toolNamed(tools, 'generate_image_from_template').inputSchema;
 
-    expect(pdf.required).toEqual(['templateId']);
+    expect(pdf.required ?? []).toEqual([]);
+    expect(pdf.properties).toHaveProperty('pages');
     expect(shapeOf(pdf.properties?.templateId)).toEqual(
       shapeOf(image.properties?.templateId)
     );
@@ -195,16 +198,59 @@ describe('generate_pdf_from_template', () => {
     );
   });
 
-  it('refuses a call without templateId and never reaches the API', async () => {
-    // Without this, an unregistered tool would also "refuse" the call.
-    toolNamed((await client.listTools()).tools, 'generate_pdf_from_template');
-
+  it('leaves the templateId-or-pages rule to the API: a call with neither still reaches it', async () => {
+    // AC58: the API validates the either/or rules, so the tool passes the body through.
     const result = await call(client, 'generate_pdf_from_template', {
       modify: { name: 'Ada' },
     });
 
-    expect(result.isError).toBe(true);
-    expect(fetchMock).not.toHaveBeenCalled();
+    const request = sentRequest(fetchMock);
+    expect(request.url).toBe(`${API_BASE_URL}/pdf/template`);
+    expect(JSON.parse(String(request.body))).toEqual({
+      modify: { name: 'Ada' },
+    });
+    expect(result.isError).toBeFalsy();
+  });
+
+  it('POSTs templateId, modify and pages to /v1/pdf/template unchanged', async () => {
+    const pages = [
+      { templateId: 'tpl_cover', modify: { title: 'Q3', nested: { a: [1, 2] } } },
+      { html: '<h1>{{title}}</h1>' },
+      { modify: { section: 2 } },
+      {},
+    ];
+
+    const result = await call(client, 'generate_pdf_from_template', {
+      templateId: 'tpl_default',
+      modify: { shared: true },
+      pages,
+    });
+
+    const request = sentRequest(fetchMock);
+    expect(request.url).toBe(`${API_BASE_URL}/pdf/template`);
+    expect(request.method).toBe('POST');
+    expect(JSON.parse(String(request.body))).toEqual({
+      templateId: 'tpl_default',
+      modify: { shared: true },
+      pages,
+    });
+    expect(result.isError).toBeFalsy();
+  });
+
+  it('POSTs pages without a templateId when the caller gives none', async () => {
+    const pages = [{ templateId: 'tpl_a' }, { html: '<p>x</p>' }];
+
+    const result = await call(client, 'generate_pdf_from_template', {
+      modify: { shared: true },
+      pages,
+    });
+
+    const request = sentRequest(fetchMock);
+    expect(JSON.parse(String(request.body))).toEqual({
+      modify: { shared: true },
+      pages,
+    });
+    expect(result.isError).toBeFalsy();
   });
 
   it('POSTs { templateId, modify } as JSON to /v1/pdf/template with the API key and the mcp source header', async () => {
@@ -271,6 +317,83 @@ describe('PDF tool results', () => {
     }
   );
 
+  it('generate_pdf_from_template returns the credits spent and the page count of each entry (AC58)', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        ...PDF_BODY,
+        pages: 57,
+        credits: 3,
+        entries: [
+          { index: 0, pages: 7 },
+          { index: 1, pages: 19 },
+          { index: 2, pages: 31 },
+        ],
+      })
+    );
+
+    const result = await call(client, 'generate_pdf_from_template', {
+      templateId: 'tpl_1',
+      pages: [{}, {}, {}],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const text = firstText(result);
+    expect(text).toContain(PDF_BODY.pdfUrl);
+    expect(text).toMatch(/\b57\b/);
+    const creditLine = text
+      .split('\n')
+      .find((line) => /credit/i.test(line) && /\b3\b/.test(line));
+    expect(creditLine, `no line states 3 credits in:\n${text}`).toBeDefined();
+    for (const pages of [7, 19, 31]) {
+      expect(text).toMatch(new RegExp(`\\b${pages}\\b`));
+    }
+  });
+
+  it.each<[string, Record<string, unknown>]>([
+    ['generate_pdf_from_template', { templateId: 'tpl_1', pages: [{}, {}, {}, {}] }],
+    ['generate_pdf_from_html', { html: '<p>x</p>' }],
+  ])(
+    '%s puts every line of the API logs into its error text (AC59)',
+    async (name, args) => {
+      const logs = [
+        "pages[3]: template 'x' not found",
+        'pages[1]: give templateId or html, not both',
+      ];
+      fetchMock.mockResolvedValue(
+        jsonResponse({ error: true, message: 'Invalid pages', logs }, 422)
+      );
+
+      const result = await call(client, name, args);
+
+      expect(result.isError).toBe(true);
+      for (const line of logs) {
+        expect(firstText(result)).toContain(line);
+      }
+    }
+  );
+
+  it.each<[string, Record<string, unknown>, string]>([
+    [
+      'generate_pdf_from_template',
+      { templateId: 'tpl_1', pages: [{}, {}] },
+      'Another multi-page PDF from this account is still rendering',
+    ],
+    ['generate_pdf_from_template', { templateId: 'tpl_1' }, 'Too Many Requests'],
+    ['generate_pdf_from_html', { html: '<p>x</p>' }, 'Too Many Requests'],
+  ])(
+    '%s includes the server message of a 429 in its error text (AC59): %j -> %s',
+    async (name, args, message) => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({ error: true, message }, 429)
+      );
+
+      const result = await call(client, name, args);
+
+      expect(result.isError).toBe(true);
+      expect(firstText(result)).toContain(message);
+    }
+  );
+
   // [pdf tool, image sibling, HTTP status, API message, arguments for both]
   it.each<[string, string, number, string, Record<string, unknown>]>([
     [
@@ -314,6 +437,58 @@ describe('PDF tool results', () => {
       expect(pdfResult.isError).toBe(true);
       expect(firstText(pdfResult)).toContain(apiMessage);
       expect(pdfResult).toEqual(imageResult);
+    }
+  );
+});
+
+describe('PDF tool descriptions (AC58)', () => {
+  let client: Client;
+
+  beforeEach(async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    client = await connect();
+  });
+
+  afterEach(async () => {
+    await client.close();
+    vi.unstubAllGlobals();
+  });
+
+  // [tool, check of that tool's own page-size rule]
+  it.each<[string, (description: string) => void]>([
+    [
+      'generate_pdf_from_html',
+      // @page, else A4.
+      (description) => {
+        expect(description).toContain('@page');
+        expect(description).toContain('A4');
+      },
+    ],
+    [
+      'generate_pdf_from_template',
+      // @page, then the template's size, then A4: named in that order.
+      (description) => {
+        const page = description.indexOf('@page');
+        const a4 = description.indexOf('A4');
+        expect(page).toBeGreaterThanOrEqual(0);
+        expect(a4).toBeGreaterThan(page);
+        const between = description.slice(page, a4);
+        expect(between).toMatch(/template/i);
+        expect(between).toMatch(/size/i);
+      },
+    ],
+  ])(
+    '%s states the price rule (1 credit per 20 pages), the 100-page limit and its own page-size rule',
+    async (name, pageSizeRule) => {
+      const { tools } = await client.listTools();
+      const description = toolNamed(tools, name).description ?? '';
+
+      expect(description).toMatch(/credit/i);
+      expect(description).toMatch(/\b20\b/);
+      expect(description).toMatch(/\b100\b/);
+      // The old flat price stopped being true.
+      expect(description).not.toMatch(/per PDF of up to 20 pages/i);
+      pageSizeRule(description);
     }
   );
 });

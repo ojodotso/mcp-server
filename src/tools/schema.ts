@@ -52,6 +52,14 @@ export const generateImageFromHtmlSchema = {
   inspect,
 } satisfies z.ZodRawShape;
 
+const strict = z
+  .boolean()
+  .optional()
+  .describe(
+    'true to fail instead of rendering when the result would list warnings: a `modify` key the' +
+      ' template does not read, or an input left out that would print its default or nothing.'
+  );
+
 export const generateImageFromTemplateSchema = {
   templateId: z
     .string()
@@ -66,6 +74,7 @@ export const generateImageFromTemplateSchema = {
   viewportHeight,
   transparentBackground,
   inspect,
+  strict,
 } satisfies z.ZodRawShape;
 
 export const generatePdfFromHtmlSchema = {
@@ -79,8 +88,45 @@ export const generatePdfFromHtmlSchema = {
 } satisfies z.ZodRawShape;
 
 export const generatePdfFromTemplateSchema = {
-  templateId: generateImageFromTemplateSchema.templateId,
-  modify: generateImageFromTemplateSchema.modify,
+  templateId: generateImageFromTemplateSchema.templateId
+    .optional()
+    .describe(
+      'Id of an existing oJo template (from list_templates). With `pages`, the default template' +
+        ' for entries that name none; optional when every entry names a template or gives html.'
+    ),
+  modify: generateImageFromTemplateSchema.modify
+    .optional()
+    .describe(
+      'Variables to override. With `pages`, shared by every template entry, under each' +
+        " entry's own `modify`."
+    ),
+  pages: z
+    .array(
+      z.object({
+        templateId: z
+          .string()
+          .optional()
+          .describe('Template for this entry. Defaults to the top-level templateId.'),
+        html: z
+          .string()
+          .optional()
+          .describe(
+            'HTML for this entry instead of a template, printed as is with no variables.' +
+              SELF_CONTAINED_RULE
+          ),
+        modify: z
+          .record(z.any())
+          .optional()
+          .describe("Variables for this entry, over the template's and the top-level modify."),
+      })
+    )
+    .max(100)
+    .optional()
+    .describe(
+      'Documents of one PDF, merged in order, up to 100 entries. Each entry gives templateId or' +
+        ' html (not both), or neither to use the top-level templateId, and prints at least one page.'
+    ),
+  strict,
 } satisfies z.ZodRawShape;
 
 export const listTemplatesSchema = {
@@ -121,6 +167,12 @@ export const createTemplateSchema = {
     ),
 } satisfies z.ZodRawShape;
 
+export const updateTemplateSchema = {
+  templateId: z.string().describe('Id of the template to update.'),
+  html: createTemplateSchema.html,
+  variables: createTemplateSchema.variables,
+} satisfies z.ZodRawShape;
+
 export const createPreviewLinkSchema = {
   html: z
     .string()
@@ -158,6 +210,9 @@ export type ListTemplatesArgs = z.infer<z.ZodObject<typeof listTemplatesSchema>>
 export type GetTemplateArgs = z.infer<z.ZodObject<typeof getTemplateSchema>>;
 export type CreateTemplateArgs = z.infer<
   z.ZodObject<typeof createTemplateSchema>
+>;
+export type UpdateTemplateArgs = z.infer<
+  z.ZodObject<typeof updateTemplateSchema>
 >;
 export type CreatePreviewLinkArgs = z.infer<
   z.ZodObject<typeof createPreviewLinkSchema>

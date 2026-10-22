@@ -2,19 +2,25 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "so.ojo/mcp-server",
   "title": "oJo — HTML to image and PDF",
-  "description": "Render HTML or templates to a hosted PNG or PDF, in one response. Free previews need no API key.",
-  "version": "0.5.0",
+  "description": "Fill an HTML template with JSON and get a hosted PDF or image link. Free previews, no key.",
+  "version": "0.8.0",
   "websiteUrl": "https://ojo.so/docs/mcp-server",
   "repository": {
     "url": "https://github.com/ojodotso/mcp-server",
     "source": "github",
     "id": "1332330493"
   },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.ojo.so/mcp"
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@ojodotso/mcp-server",
-      "version": "0.5.0",
+      "version": "0.8.0",
       "transport": {
         "type": "stdio"
       },

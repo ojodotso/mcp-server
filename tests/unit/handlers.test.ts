@@ -14,6 +14,7 @@ import {
   makeListTemplates,
 } from '../../src/tools/handlers/template-handlers.js';
 import { makeCreatePreviewLink } from '../../src/tools/handlers/preview-handlers.js';
+import { makeGeneratePdfFromTemplate } from '../../src/tools/handlers/pdf-handlers.js';
 
 function fakeClient(methods: Partial<OjoApiClient>): OjoApiClient {
   return methods as OjoApiClient;
@@ -154,6 +155,58 @@ describe('image handlers', () => {
 
     expect(result.isError).toBe(true);
     expect(firstText(result)).toContain('Out of credits');
+  });
+});
+
+describe('pdf handlers (AC58)', () => {
+  const PDF = {
+    id: 'pdf_1',
+    pdfUrl: 'https://u/p.pdf',
+    pages: 57,
+    credits: 3,
+    entries: [
+      { index: 0, pages: 7 },
+      { index: 1, pages: 19 },
+      { index: 2, pages: 31 },
+    ],
+  };
+  const PAGES = [
+    { templateId: 'tpl_cover', modify: { title: 'Q3' } },
+    { html: '<h1>{{title}}</h1>' },
+    { modify: { section: 2 } },
+  ];
+
+  it('passes templateId, modify and pages to the client unchanged', async () => {
+    const createPdfFromTemplate = vi.fn().mockResolvedValue(PDF);
+    const handler = makeGeneratePdfFromTemplate(
+      fakeClient({ createPdfFromTemplate })
+    );
+
+    await handler({
+      templateId: 'tpl_default',
+      modify: { shared: true },
+      pages: PAGES,
+    });
+
+    expect(createPdfFromTemplate).toHaveBeenCalledWith({
+      templateId: 'tpl_default',
+      modify: { shared: true },
+      pages: PAGES,
+    });
+  });
+
+  it('passes pages without a top-level templateId', async () => {
+    const createPdfFromTemplate = vi.fn().mockResolvedValue(PDF);
+    const handler = makeGeneratePdfFromTemplate(
+      fakeClient({ createPdfFromTemplate })
+    );
+
+    await handler({ modify: { shared: true }, pages: PAGES });
+
+    // toEqual treats an undefined templateId as absent.
+    expect(createPdfFromTemplate.mock.calls).toEqual([
+      [{ modify: { shared: true }, pages: PAGES }],
+    ]);
   });
 });
 

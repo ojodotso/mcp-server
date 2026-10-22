@@ -1,10 +1,14 @@
 # @ojodotso/mcp-server
 
-A [Model Context Protocol](https://modelcontextprotocol.io) server that lets an
-AI agent turn HTML into images and PDFs. Live previews are free and need no
-account; an oJo API key adds hosted PNG and PDF URLs and reusable templates
-through the user's own account. Transport is local **stdio**; the API boundary is HTTP to
+oJo turns an HTML template and your JSON data into a PDF or PNG at a hosted link,
+from the REST API, any MCP client or the editor. This package is oJo's
+[Model Context Protocol](https://modelcontextprotocol.io) server. Live previews are free and need
+no account; an oJo API key adds hosted PNG and PDF links and reusable templates through the user's
+own account. Transport is local **stdio**; the API boundary is HTTP to
 `https://api.ojo.so/v1` only.
+
+Most clients can connect to `https://mcp.ojo.so/mcp` directly and sign in, without installing
+anything: see <https://ojo.so/docs/mcp-server>. This package is the local alternative.
 
 ## Quick start — no account needed
 
@@ -61,11 +65,12 @@ the oJo API, so advertising them keyless would offer tools that can only fail.
 | `create_preview_link` | Build a free, full-resolution `/preview` link for an HTML/Handlebars draft. | — | no |
 | `generate_image_from_html` | Render plain HTML (with inline CSS) to a PNG; returns its public URL. | 1 | yes |
 | `generate_image_from_template` | Render an existing template, optionally overriding variables via `modify`. | 1 | yes |
-| `generate_pdf_from_html` | Render plain HTML (with inline CSS) to a PDF of up to 20 pages, A4 unless a CSS `@page` rule sets the size; returns its public URL and page count. A longer document is refused and costs nothing. | 1 | yes |
-| `generate_pdf_from_template` | Render an existing template to a PDF, optionally overriding variables via `modify`. | 1 | yes |
+| `generate_pdf_from_html` | Render plain HTML (with inline CSS) to a PDF of up to 100 pages, A4 unless a CSS `@page` rule sets the size; returns its public URL, page count and credits spent. A longer document is refused and costs nothing. | 1 per 20 pages | yes |
+| `generate_pdf_from_template` | Render an existing template to a PDF, optionally overriding variables via `modify`, or build one PDF of up to 100 pages from many templates and HTML with `pages`. | 1 per 20 pages | yes |
 | `list_templates` | List the templates available to the account. | — | yes |
-| `get_template` | Fetch one template's decoded HTML and variable defaults. | — | yes |
+| `get_template` | Fetch one template's HTML and variable defaults. | — | yes |
 | `create_template` | Create a reusable template from plain HTML/Handlebars. | — | yes |
+| `update_template` | Replace a template's HTML, and its variable defaults when given, under the same ID. Overwrites: API renders use the new version at once. | — | yes |
 
 ### The design loop
 

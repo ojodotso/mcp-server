@@ -10,19 +10,33 @@ export interface ViewportOptions {
   viewportWidth?: number;
   viewportHeight?: number;
   transparentBackground?: boolean;
+  /** Template renders only: fail instead of answering warnings. */
+  strict?: boolean;
 }
 
 export interface GeneratedImage {
   id: string;
   imageUrl: string;
   createdAt?: string;
+  /** Keys the template does not read, and inputs left out. */
+  warnings?: string[];
 }
 
 export interface GeneratedPdf {
   id: string;
   pdfUrl: string;
   pages: number;
+  credits: number;
+  /** Pages printed by each entry, present only when the request sent `pages`. */
+  entries?: Array<{ index: number; pages: number }>;
   createdAt?: string;
+  warnings?: string[];
+}
+
+export interface PdfPageEntry {
+  templateId?: string;
+  html?: string;
+  modify?: Record<string, unknown>;
 }
 
 export interface ListTemplatesParams {
@@ -50,7 +64,7 @@ export interface TemplateList {
 export interface TemplateDetail {
   id: string;
   name: string;
-  /** Decoded (plain) HTML — the API returns it base64-encoded; decoded here. */
+  /** The HTML as stored. */
   html: string;
   variables: unknown;
   createdAt: string;
@@ -61,6 +75,10 @@ export interface CreatedTemplate {
   id: string;
   message?: string;
 }
+
+/** A template body: the html as plain HTML, variables only when given. */
+const templateBody = (html: string, variables?: Record<string, unknown>) =>
+  JSON.stringify({ html, ...(variables !== undefined && { variables }) });
 
 /** Error from the oJo API carrying the HTTP status and an agent-readable message. */
 export class OjoApiError extends Error {
@@ -129,6 +147,7 @@ export class OjoApiClient {
     if (options.transparentBackground !== undefined) {
       body.transparentBackground = options.transparentBackground;
     }
+    if (options.strict !== undefined) body.strict = options.strict;
     const result = await this.request<GeneratedImage>('/image/template', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -147,15 +166,25 @@ export class OjoApiClient {
     return { ...result, pdfUrl: toAbsoluteUrl(result.pdfUrl) };
   }
 
-  /** POST /pdf/template — render an existing template into a PDF. */
-  async createPdfFromTemplate(
-    templateId: string,
-    modify: Record<string, unknown> = {}
-  ): Promise<GeneratedPdf> {
+  /**
+   * POST /pdf/template — render a template, or one document per `pages` entry merged in order,
+   * into a PDF. The API validates which fields an entry needs, so the body is sent unchanged.
+   */
+  async createPdfFromTemplate({
+    templateId,
+    modify,
+    pages,
+    strict,
+  }: {
+    templateId?: string;
+    modify?: Record<string, unknown>;
+    pages?: PdfPageEntry[];
+    strict?: boolean;
+  }): Promise<GeneratedPdf> {
     const result = await this.request<GeneratedPdf>('/pdf/template', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ templateId, modify }),
+      body: JSON.stringify({ templateId, modify, pages, strict }),
     });
     return { ...result, pdfUrl: toAbsoluteUrl(result.pdfUrl) };
   }
@@ -174,33 +203,36 @@ export class OjoApiClient {
     });
   }
 
-  /** GET /template/:id — fetch one template; the API returns base64 html, decoded here. */
+  /** GET /template/:id — fetch one template, its HTML plain. */
   async getTemplate(templateId: string): Promise<TemplateDetail> {
-    const record = await this.request<TemplateDetail>(
+    return this.request<TemplateDetail>(
       `/template/${encodeURIComponent(templateId)}`,
       { method: 'GET' }
     );
-    return {
-      ...record,
-      html: Buffer.from(record.html, 'base64').toString('utf-8'),
-    };
   }
 
-  /** POST /template — create a template from plain HTML; the html is base64-encoded here. */
+  /** POST /template — create a template from plain HTML. */
   async createTemplate(
     html: string,
     variables?: Record<string, unknown>
   ): Promise<CreatedTemplate> {
-    const body: Record<string, unknown> = {
-      html: Buffer.from(html, 'utf-8').toString('base64'),
-    };
-    if (variables !== undefined) {
-      body.variables = variables;
-    }
     return this.request<CreatedTemplate>('/template', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: templateBody(html, variables),
+    });
+  }
+
+  /** PUT /template/:id — replace a template's HTML; without variables the stored defaults stay. */
+  async updateTemplate(
+    templateId: string,
+    html: string,
+    variables?: Record<string, unknown>
+  ): Promise<CreatedTemplate> {
+    return this.request<CreatedTemplate>(`/template/${encodeURIComponent(templateId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: templateBody(html, variables),
     });
   }
 
@@ -240,28 +272,45 @@ export class OjoApiClient {
 
   private async toError(response: Response): Promise<OjoApiError> {
     const body = (await response.json().catch(() => null)) as
-      | { message?: string; error?: string }
+      | { message?: string; error?: string; logs?: unknown; retryAfter?: unknown }
       | null;
     const serverMessage = body?.message ?? body?.error ?? response.statusText;
-    return new OjoApiError(
-      response.status,
-      this.describe(response.status, serverMessage)
-    );
+    // A 422 carries its reasons in `logs`, such as which `pages` entry is wrong.
+    const logs = Array.isArray(body?.logs)
+      ? body.logs.filter((log): log is string => typeof log === 'string')
+      : [];
+    const detail = logs.length ? `${serverMessage}: ${logs.join('; ')}` : serverMessage;
+    // A 429 or 503 says how long to wait in Retry-After and the body's retryAfter, in seconds (AC227,
+    // AC238).
+    const wait = [response.headers.get('retry-after'), body?.retryAfter]
+      .map(Number)
+      .find((seconds) => Number.isInteger(seconds) && seconds > 0);
+    return new OjoApiError(response.status, this.describe(response.status, detail, wait));
   }
 
-  private describe(status: number, serverMessage: string): string {
+  private describe(status: number, serverMessage: string, waitSeconds?: number): string {
+    const waitFor = (seconds: number) =>
+      seconds < 60 ? `${seconds} seconds` : `${Math.ceil(seconds / 60)} minutes`;
     switch (status) {
       case 401:
         return 'Unauthorized — set OJO_API_KEY to a valid oJo API key (create one at https://ojo.so/dashboard/api).';
       case 402:
-        return 'Out of credits — this oJo account has no remaining image credits.';
+        return 'Out of credits — this oJo account does not have enough credits for this render.';
       case 422:
         return `The oJo API rejected the request: ${serverMessage}`;
       case 429:
-        return 'Rate limited by the oJo API — slow down and retry shortly.';
-      default:
-        return `oJo API error ${status}: ${serverMessage}`;
+        return waitSeconds === undefined
+          ? `Rate limited by the oJo API: ${serverMessage}. Slow down and retry shortly.`
+          : `Rate limited by the oJo API: ${serverMessage.replace(/\.$/, '')}. Wait ${waitFor(
+              waitSeconds
+            )} before retrying.`;
+      case 503:
+        if (waitSeconds === undefined) break;
+        return `The oJo API is busy: ${serverMessage.replace(/\.$/, '')}. Wait ${waitFor(
+          waitSeconds
+        )} before retrying.`;
     }
+    return `oJo API error ${status}: ${serverMessage}`;
   }
 }
 

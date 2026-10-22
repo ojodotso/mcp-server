@@ -4,6 +4,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createServer } from '../../src/server/index.js';
 import type { OjoApiClient } from '../../src/server/ojo-client.js';
+import { pinnedShapeOf } from '../fixtures/pinned-schemas.js';
 
 async function connect(client_: OjoApiClient | null = {} as OjoApiClient) {
   const server = createServer(client_);
@@ -18,7 +19,7 @@ async function connect(client_: OjoApiClient | null = {} as OjoApiClient) {
 }
 
 describe('MCP server registration', () => {
-  it('registers exactly the tool surface, the two PDF tools included', async () => {
+  it('AC594: registers exactly the tool surface, the two PDF tools and update_template included', async () => {
     const client = await connect();
 
     const { tools } = await client.listTools();
@@ -33,6 +34,7 @@ describe('MCP server registration', () => {
       'generate_pdf_from_template',
       'get_template',
       'list_templates',
+      'update_template',
     ]);
 
     await client.close();
@@ -53,7 +55,7 @@ describe('MCP server registration', () => {
 
     expect(Object.keys(expected)).toHaveLength(6);
     for (const [name, schema] of Object.entries(expected)) {
-      expect(byName.get(name), name).toEqual(schema);
+      expect(pinnedShapeOf(byName.get(name)), name).toEqual(schema);
     }
 
     await client.close();

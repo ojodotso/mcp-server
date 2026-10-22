@@ -21,6 +21,7 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "ES2022",
+    "types": ["*"],
     "rootDir": "./src",
     "outDir": "./build"
   },

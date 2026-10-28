@@ -1,9 +1,11 @@
 import {
+  HEADER_CLIENT_VERSION,
   HEADER_SOURCE,
   HEADER_TRANSPARENT_BACKGROUND,
   HEADER_VIEWPORT_HEIGHT,
   HEADER_VIEWPORT_WIDTH,
   OJO_API_BASE_URL,
+  VERSION,
 } from '../constants.js';
 
 export interface ViewportOptions {
@@ -37,6 +39,31 @@ export interface PdfPageEntry {
   templateId?: string;
   html?: string;
   modify?: Record<string, unknown>;
+}
+
+export interface Credits {
+  left: number;
+  total: number;
+  expiresAt: string | null;
+}
+
+export interface ListRendersParams {
+  format: 'image' | 'pdf';
+  page?: number;
+  pageSize?: number;
+  sort?: 'asc' | 'desc';
+}
+
+interface RawRenderList {
+  items?: Array<{ id: string; imageUrl?: string; pdfUrl?: string; pages?: number; createdAt: string }>;
+  totalItems: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
+}
+
+export interface RenderList extends Omit<RawRenderList, 'items'> {
+  items: Array<{ id: string; url: string; pages?: number; createdAt: string }>;
 }
 
 export interface ListTemplatesParams {
@@ -74,11 +101,31 @@ export interface TemplateDetail {
 export interface CreatedTemplate {
   id: string;
   message?: string;
+  warnings?: string[];
 }
 
-/** A template body: the html as plain HTML, variables only when given. */
-const templateBody = (html: string, variables?: Record<string, unknown>) =>
-  JSON.stringify({ html, ...(variables !== undefined && { variables }) });
+/** What a template create or update sends. A field left undefined is left out of the JSON body. */
+export interface TemplateFields {
+  html?: string;
+  variables?: Record<string, unknown>;
+  name?: string;
+  description?: string;
+  viewportWidth?: number;
+  viewportHeight?: number;
+}
+
+export interface BulkImages {
+  images: GeneratedImage[];
+  /** One entry per image that did not render, with the modifications it was given. */
+  errors?: Array<{ modify: unknown; error: string; logs?: unknown }>;
+  /** Request-level warnings, such as unknown fields, beside each image's own. */
+  warnings?: string[];
+}
+
+export interface PdfCheck {
+  pages: number;
+  warnings: string[];
+}
 
 /** Error from the oJo API carrying the HTTP status and an agent-readable message. */
 export class OjoApiError extends Error {
@@ -99,10 +146,13 @@ export class OjoApiError extends Error {
 export class OjoApiClient {
   private readonly apiKey: string;
   private readonly baseUrl: string;
+  /** Behind mcp.ojo.so: the key comes from the AI app's connection, and the API refuses its deletes (AC141). */
+  readonly remote: boolean;
 
-  constructor(apiKey: string, baseUrl: string = OJO_API_BASE_URL) {
+  constructor(apiKey: string, baseUrl: string = OJO_API_BASE_URL, { remote = false } = {}) {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
+    this.remote = remote;
   }
 
   /**
@@ -214,32 +264,102 @@ export class OjoApiClient {
   /** POST /template — create a template from plain HTML. */
   async createTemplate(
     html: string,
-    variables?: Record<string, unknown>
+    fields: Omit<TemplateFields, 'html'> = {}
   ): Promise<CreatedTemplate> {
     return this.request<CreatedTemplate>('/template', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: templateBody(html, variables),
+      body: JSON.stringify({ html, ...fields }),
     });
   }
 
-  /** PUT /template/:id — replace a template's HTML; without variables the stored defaults stay. */
-  async updateTemplate(
-    templateId: string,
-    html: string,
-    variables?: Record<string, unknown>
-  ): Promise<CreatedTemplate> {
+  /** PUT /template/:id — change only the given fields; a name alone renames without a re-render. */
+  async updateTemplate(templateId: string, fields: TemplateFields): Promise<CreatedTemplate> {
     return this.request<CreatedTemplate>(`/template/${encodeURIComponent(templateId)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: templateBody(html, variables),
+      body: JSON.stringify(fields),
     });
+  }
+
+  /** DELETE /template/:id — the template and its id stop working for later renders. */
+  /** GET /credits — the credits left in the current batches (AC1378). */
+  async getCredits(): Promise<Credits> {
+    return this.request<Credits>('/credits', { method: 'GET' });
+  }
+
+  /** GET /image or /pdf — one page of render records, links made absolute. */
+  async listRenders({ format, ...params }: ListRendersParams): Promise<RenderList> {
+    const query = new URLSearchParams();
+    if (params.page !== undefined) query.set('page', String(params.page));
+    if (params.pageSize !== undefined) query.set('pageSize', String(params.pageSize));
+    if (params.sort !== undefined) query.set('sort', params.sort);
+    const qs = query.toString();
+    const result = await this.request<RawRenderList>(`/${format}${qs ? `?${qs}` : ''}`, { method: 'GET' });
+    return {
+      ...result,
+      items: (result.items ?? []).map(({ imageUrl, pdfUrl, ...item }) => ({
+        ...item,
+        url: toAbsoluteUrl(imageUrl ?? pdfUrl ?? ''),
+      })),
+    };
+  }
+
+  async deleteTemplate(templateId: string): Promise<{ deleted: boolean }> {
+    return this.request(`/template/${encodeURIComponent(templateId)}`, { method: 'DELETE' });
+  }
+
+  /** POST /image/bulk — one image per modifications entry, all from one template. */
+  async createImagesFromTemplate(
+    templateId: string,
+    modifications: Array<Record<string, unknown>>,
+    { strict, ...options }: ViewportOptions = {}
+  ): Promise<BulkImages> {
+    const result = await this.request<BulkImages>('/image/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ templates: [{ templateId, modifications, ...options }], strict }),
+    });
+    const images = (result.images ?? []).map((image) => ({ ...image, imageUrl: toAbsoluteUrl(image.imageUrl) }));
+    return { ...result, images };
+  }
+
+  /**
+   * POST /pdf/preview — print raw HTML without storing it or spending a credit. The answer is the PDF
+   * itself; only its page count and render warnings, both in headers, are kept.
+   */
+  async checkPdf(html: string): Promise<PdfCheck> {
+    const response = await this.send('/pdf/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/html' },
+      body: html,
+    });
+    // Only the headers are kept; an unread body holds its connection until garbage collection.
+    await response.body?.cancel();
+    const pages = Number(response.headers.get('x-pdf-pages'));
+    if (!Number.isInteger(pages) || pages < 1) {
+      throw new OjoApiError(response.status, 'The oJo API answered the PDF check without a page count.');
+    }
+    return { pages, warnings: decodeWarnings(response.headers.get('x-render-warnings')) };
   }
 
   private async request<T>(
     path: string,
     init: { method: string; headers?: Record<string, string>; body?: string }
   ): Promise<T> {
+    const response = await this.send(path, init);
+    const contentType = response.headers.get('content-type') ?? '';
+    if (contentType.includes('application/json')) {
+      return (await response.json()) as T;
+    }
+    return (await response.text()) as unknown as T;
+  }
+
+  /** Fetch with the key and source header; a non-2xx answer throws an agent-readable OjoApiError. */
+  private async send(
+    path: string,
+    init: { method: string; headers?: Record<string, string>; body?: string }
+  ): Promise<Response> {
     let response: Response;
     try {
       response = await fetch(`${this.baseUrl}${path}`, {
@@ -248,6 +368,7 @@ export class OjoApiClient {
           ...init.headers,
           Authorization: `Bearer ${this.apiKey}`,
           [HEADER_SOURCE]: 'mcp',
+          [HEADER_CLIENT_VERSION]: VERSION,
         },
         body: init.body,
       });
@@ -262,12 +383,7 @@ export class OjoApiClient {
     if (!response.ok) {
       throw await this.toError(response);
     }
-
-    const contentType = response.headers.get('content-type') ?? '';
-    if (contentType.includes('application/json')) {
-      return (await response.json()) as T;
-    }
-    return (await response.text()) as unknown as T;
+    return response;
   }
 
   private async toError(response: Response): Promise<OjoApiError> {
@@ -293,9 +409,12 @@ export class OjoApiClient {
       seconds < 60 ? `${seconds} seconds` : `${Math.ceil(seconds / 60)} minutes`;
     switch (status) {
       case 401:
-        return 'Unauthorized — set OJO_API_KEY to a valid oJo API key (create one at https://ojo.so/dashboard/api).';
+        return this.remote
+          ? 'Unauthorized — the connection to oJo has expired or was removed. Reconnect oJo in your AI app.'
+          : 'Unauthorized — set OJO_API_KEY to a valid oJo API key (create one at https://ojo.so/dashboard/api).';
       case 402:
-        return 'Out of credits — this oJo account does not have enough credits for this render.';
+        // The API's message names the pricing page (AC1376).
+        return `Out of credits — ${serverMessage}`;
       case 422:
         return `The oJo API rejected the request: ${serverMessage}`;
       case 429:
@@ -311,6 +430,18 @@ export class OjoApiClient {
         )} before retrying.`;
     }
     return `oJo API error ${status}: ${serverMessage}`;
+  }
+}
+
+/** `X-Render-Warnings`: a percent-encoded JSON array of strings. A header that does not decode is
+ * dropped rather than failing a check whose page count arrived. */
+function decodeWarnings(header: string | null): string[] {
+  if (!header) return [];
+  try {
+    const warnings: unknown = JSON.parse(decodeURIComponent(header));
+    return Array.isArray(warnings) ? warnings.map(String) : [];
+  } catch {
+    return [];
   }
 }
 

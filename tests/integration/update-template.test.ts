@@ -11,11 +11,15 @@ import { OjoApiClient } from '../../src/server/ojo-client.js';
 const API_BASE_URL = 'https://api.example/v1';
 const API_KEY = 'ok_update_key';
 
+// AC12 (.claude/docs/specs/2026-10-26-mcp-api-parity.md, revised after review) replaces the AC597
+// wording.
 const DESCRIPTION =
-  'Replace the HTML of an existing oJo template this account owns, and its variable defaults ' +
-  'when `variables` is given (left out, the stored defaults stay). The template keeps its ID: API ' +
-  'renders and an oJo editor open on it use the new version at once, so check the design with ' +
-  '`create_preview_link` first. Does not cost a credit.';
+  'Rename an existing oJo template this account owns, or replace its HTML or its variable ' +
+  'defaults. Give only what changes: a `name` alone renames without touching the design, ' +
+  '`variables` left out keeps the stored defaults, and a viewport is kept only together with ' +
+  '`html` or `variables`. The template keeps its ID: API renders and an oJo editor open on it use ' +
+  'the new version at once, so check a new design with `create_preview_link` first. Does not ' +
+  'cost a credit.';
 
 type FetchMock = ReturnType<typeof vi.fn>;
 
@@ -92,7 +96,9 @@ describe('AC594: update_template is registered only with an API key', () => {
     expect(tools.map((t) => t.name)).not.toContain('update_template');
   });
 
-  it('AC594: input is templateId and html (strings, required) and variables (object, optional)', async () => {
+  // AC594 as amended by AC2 of the 2026-10-26 MCP API parity spec: html is optional, and name and
+  // the viewport join the input.
+  it('AC594/AC2: input is templateId (string, required), html, name (strings), variables (object) and the viewport, all optional', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
     await client.close();
@@ -102,11 +108,19 @@ describe('AC594: update_template is registered only with an API key', () => {
       | undefined;
     expect(schema, 'update_template is listed').toBeDefined();
     expect(schema?.type).toBe('object');
-    expect(Object.keys(schema?.properties ?? {}).sort()).toEqual(['html', 'templateId', 'variables']);
+    expect(Object.keys(schema?.properties ?? {}).sort()).toEqual([
+      'html',
+      'name',
+      'templateId',
+      'variables',
+      'viewportHeight',
+      'viewportWidth',
+    ]);
     expect(schema?.properties?.templateId?.type).toBe('string');
     expect(schema?.properties?.html?.type).toBe('string');
+    expect(schema?.properties?.name?.type).toBe('string');
     expect(schema?.properties?.variables?.type).toBe('object');
-    expect([...(schema?.required ?? [])].sort()).toEqual(['html', 'templateId']);
+    expect([...(schema?.required ?? [])].sort()).toEqual(['templateId']);
   });
 
   it('AC594: annotations are readOnlyHint false, destructiveHint true, idempotentHint true', async () => {
@@ -122,8 +136,8 @@ describe('AC594: update_template is registered only with an API key', () => {
   });
 });
 
-describe('AC597: update_template description', () => {
-  it('AC597: the description reads exactly as the spec fixes it', async () => {
+describe('AC597/AC12: update_template description', () => {
+  it('AC597/AC12: the description reads exactly as AC12 fixes it', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
     await client.close();

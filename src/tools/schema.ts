@@ -148,9 +148,28 @@ export const listTemplatesSchema = {
     .describe('Sort by creation time, ascending or descending (default desc).'),
 } satisfies z.ZodRawShape;
 
+export const listRendersSchema = {
+  format: z.enum(['image', 'pdf']).describe('List images (PNG) or PDFs.'),
+  page: z.number().int().min(1).optional().describe('1-based page number (default 1).'),
+  pageSize: z.number().int().min(1).max(100).optional().describe('Renders per page, 1 to 100 (default 10).'),
+  sort: listTemplatesSchema.sort,
+} satisfies z.ZodRawShape;
+
+export const getCreditsSchema = {} satisfies z.ZodRawShape;
+
 export const getTemplateSchema = {
   templateId: z.string().describe('Id of the template to fetch.'),
 } satisfies z.ZodRawShape;
+
+// The API's rule: 1 to 120 characters, not blank (apps/server/src/routes/template.ts).
+const templateName = z
+  .string()
+  .refine(
+    (name) => name.trim().length >= 1 && name.trim().length <= 120,
+    'The name must be 1 to 120 characters, spaces at either end not counted.'
+  )
+  .optional()
+  .describe('Template name shown in the dashboard and list_templates, 1 to 120 characters.');
 
 export const createTemplateSchema = {
   html: z
@@ -165,12 +184,53 @@ export const createTemplateSchema = {
     .describe(
       'Template Variables: the default values/shape for the template placeholders (the schema, not per-render data).'
     ),
+  name: templateName,
+  description: z
+    .string()
+    .max(300)
+    .optional()
+    .describe('What the template is for, up to 300 characters.'),
+  viewportWidth: viewportWidth.describe(
+    "Width in pixels of the template's preview and PDF renders, kept only with viewportHeight." +
+      ' Image renders do not read it: pass the viewport on every image render.'
+  ),
+  viewportHeight: viewportHeight.describe(
+    "Height in pixels of the template's preview and PDF renders, kept only with viewportWidth." +
+      ' Image renders do not read it: pass the viewport on every image render.'
+  ),
 } satisfies z.ZodRawShape;
 
 export const updateTemplateSchema = {
   templateId: z.string().describe('Id of the template to update.'),
-  html: createTemplateSchema.html,
+  name: templateName,
+  html: createTemplateSchema.html.optional(),
   variables: createTemplateSchema.variables,
+  viewportWidth: createTemplateSchema.viewportWidth,
+  viewportHeight: createTemplateSchema.viewportHeight,
+} satisfies z.ZodRawShape;
+
+export const deleteTemplateSchema = {
+  templateId: z.string().describe('Id of the template to delete.'),
+} satisfies z.ZodRawShape;
+
+export const generateImagesFromTemplateSchema = {
+  templateId: generateImageFromTemplateSchema.templateId,
+  modifications: z
+    .array(z.record(z.any()))
+    .min(1)
+    .max(50)
+    .describe(
+      'One Modify Payload per image, 1 to 50, rendered in this order. Each overrides the template' +
+        ' variable defaults for its own image.'
+    ),
+  viewportWidth,
+  viewportHeight,
+  transparentBackground,
+  strict,
+} satisfies z.ZodRawShape;
+
+export const checkPdfSchema = {
+  html: generatePdfFromHtmlSchema.html,
 } satisfies z.ZodRawShape;
 
 export const createPreviewLinkSchema = {
@@ -214,6 +274,12 @@ export type CreateTemplateArgs = z.infer<
 export type UpdateTemplateArgs = z.infer<
   z.ZodObject<typeof updateTemplateSchema>
 >;
+export type DeleteTemplateArgs = z.infer<z.ZodObject<typeof deleteTemplateSchema>>;
+export type GenerateImagesFromTemplateArgs = z.infer<
+  z.ZodObject<typeof generateImagesFromTemplateSchema>
+>;
+export type ListRendersArgs = z.infer<z.ZodObject<typeof listRendersSchema>>;
+export type CheckPdfArgs = z.infer<z.ZodObject<typeof checkPdfSchema>>;
 export type CreatePreviewLinkArgs = z.infer<
   z.ZodObject<typeof createPreviewLinkSchema>
 >;

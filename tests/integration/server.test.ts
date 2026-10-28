@@ -19,20 +19,25 @@ async function connect(client_: OjoApiClient | null = {} as OjoApiClient) {
 }
 
 describe('MCP server registration', () => {
-  it('AC594: registers exactly the tool surface, the two PDF tools and update_template included', async () => {
+  it('AC594, AC3-AC5, AC1381, AC1384: registers exactly the tool surface, the PDF tools, update_template, the parity tools, get_credits and list_renders included', async () => {
     const client = await connect();
 
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
 
     expect(names).toEqual([
+      'check_pdf',
       'create_preview_link',
       'create_template',
+      'delete_template',
       'generate_image_from_html',
       'generate_image_from_template',
+      'generate_images_from_template',
       'generate_pdf_from_html',
       'generate_pdf_from_template',
+      'get_credits',
       'get_template',
+      'list_renders',
       'list_templates',
       'update_template',
     ]);
@@ -55,7 +60,7 @@ describe('MCP server registration', () => {
 
     expect(Object.keys(expected)).toHaveLength(6);
     for (const [name, schema] of Object.entries(expected)) {
-      expect(pinnedShapeOf(byName.get(name)), name).toEqual(schema);
+      expect(pinnedShapeOf(byName.get(name), name), name).toEqual(schema);
     }
 
     await client.close();

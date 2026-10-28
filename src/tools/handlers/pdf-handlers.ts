@@ -1,6 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { GeneratedPdf, OjoApiClient } from '../../server/ojo-client.js';
 import type {
+  CheckPdfArgs,
   GeneratePdfFromHtmlArgs,
   GeneratePdfFromTemplateArgs,
 } from '../schema.js';
@@ -26,6 +27,19 @@ export function makeGeneratePdfFromTemplate(client: OjoApiClient) {
         strict: args.strict,
       });
       return textResult(formatPdf(pdf));
+    } catch (error) {
+      return toErrorResult(error);
+    }
+  };
+}
+
+export function makeCheckPdf(client: OjoApiClient) {
+  return async (args: CheckPdfArgs): Promise<CallToolResult> => {
+    try {
+      const { pages, warnings } = await client.checkPdf(args.html);
+      return textResult(
+        [`pages: ${pages}`, ...warnings.map((warning) => `warning: ${warning}`)].join('\n')
+      );
     } catch (error) {
       return toErrorResult(error);
     }

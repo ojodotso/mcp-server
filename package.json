@@ -1,6 +1,6 @@
 {
   "name": "@ojodotso/mcp-server",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "mcpName": "so.ojo/mcp-server",
   "description": "oJo turns an HTML template and your JSON data into a PDF or PNG at a hosted link, from the REST API, any MCP client or the editor.",
   "keywords": [

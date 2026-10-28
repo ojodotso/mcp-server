@@ -26,7 +26,20 @@ const GRANT_A = '1a2b3c4d-0000-4000-8000-00000000000a';
 const GRANT_B = '1a2b3c4d-0000-4000-8000-00000000000b';
 const KEY_A = 'ojo_mcp_key_of_user_a_6f1d0c';
 const KEY_B = 'ojo_mcp_key_of_user_b_92ab4e';
-const READ_ONLY_TOOLS = ['list_templates', 'get_template', 'create_preview_link'];
+// AC13 and AC3 of the 2026-10-26 MCP API parity spec: check_pdf is read-only, and delete_template
+// joins update_template as destructive.
+// AC1381 and AC1384 of the 2026-10-26 flow coverage spec add get_credits and list_renders, both
+// read-only, and AC1375 keeps delete_template off the remote server.
+const READ_ONLY_TOOLS = [
+  'list_templates',
+  'get_template',
+  'create_preview_link',
+  'check_pdf',
+  'get_credits',
+  'list_renders',
+];
+const DESTRUCTIVE_TOOLS = ['update_template', 'delete_template'];
+const LOCAL_ONLY_TOOLS = ['delete_template'];
 
 const TOKEN_KEY = new Uint8Array(randomBytes(32));
 const OTHER_KEY = new Uint8Array(randomBytes(32));
@@ -355,11 +368,11 @@ describe('AC140: a valid access token serves stateless MCP over Streamable HTTP'
     expect(tools.length).toBeGreaterThan(0);
   });
 
-  it('AC140: tool names and input schemas equal those the stdio server exposes with an API key', async () => {
+  it('AC140, AC1375: tool names and input schemas equal those the stdio server exposes with an API key, delete_template left out', async () => {
     const { tools } = (await rpc(toolsListBody(), await tokenOfA())) as {
       tools: Array<{ name: string; inputSchema: unknown }>;
     };
-    const expected = await stdioTools();
+    const expected = (await stdioTools()).filter((t) => !LOCAL_ONLY_TOOLS.includes(t.name));
 
     expect(tools.map((t) => t.name).sort()).toEqual(expected.map((t) => t.name).sort());
     const byName = new Map(tools.map((t) => [t.name, t.inputSchema]));
@@ -371,20 +384,21 @@ describe('AC140: a valid access token serves stateless MCP over Streamable HTTP'
       readFileSync(new URL('../fixtures/existing-tool-input-schemas.json', import.meta.url), 'utf-8')
     ) as Record<string, unknown>;
     for (const [name, schema] of Object.entries(pinned)) {
-      expect(pinnedShapeOf(byName.get(name)), name).toEqual(schema);
+      expect(pinnedShapeOf(byName.get(name), name), name).toEqual(schema);
     }
   });
 
-  it('AC140, AC594: every tool states readOnlyHint and destructiveHint: the three read tools are read-only, only update_template is destructive', async () => {
+  it('AC140, AC594, AC3, AC13, AC1375, AC1381, AC1384: every tool states readOnlyHint and destructiveHint: the three read tools, check_pdf, get_credits and list_renders are read-only, only update_template is destructive', async () => {
     const { tools } = (await rpc(toolsListBody(), await tokenOfA())) as {
       tools: Array<{ name: string; annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean } }>;
     };
-    expect(tools.length).toBe(9);
+    expect(tools.length).toBe(13);
+    expect(tools.map((t) => t.name)).not.toContain('delete_template');
 
     for (const tool of tools) {
       expect(tool.annotations?.readOnlyHint, `${tool.name} readOnlyHint`).toBe(READ_ONLY_TOOLS.includes(tool.name));
       expect(tool.annotations?.destructiveHint, `${tool.name} destructiveHint`).toBe(
-        tool.name === 'update_template'
+        DESTRUCTIVE_TOOLS.includes(tool.name)
       );
     }
   });

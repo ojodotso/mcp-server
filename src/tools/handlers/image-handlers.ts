@@ -7,6 +7,7 @@ import { renderPreview, type RenderPreview } from '../../server/preview.js';
 import type {
   GenerateImageFromHtmlArgs,
   GenerateImageFromTemplateArgs,
+  GenerateImagesFromTemplateArgs,
 } from '../schema.js';
 import { toErrorResult } from '../result.js';
 
@@ -46,6 +47,41 @@ export function makeGenerateImageFromTemplate(
   };
 }
 
+export function makeGenerateImagesFromTemplate(client: OjoApiClient) {
+  return async (args: GenerateImagesFromTemplateArgs): Promise<CallToolResult> => {
+    try {
+      const { templateId, modifications, ...options } = args;
+      const { images, errors = [], warnings = [] } = await client.createImagesFromTemplate(
+        templateId,
+        modifications,
+        options
+      );
+      // A failed image keeps its modifications, the only way to tell which one it was.
+      const failed = errors.map(
+        ({ error, modify, logs }) =>
+          `failed: ${error} for ${JSON.stringify(modify)}` +
+          (Array.isArray(logs) && logs.length ? ` (${logs.join('; ')})` : '')
+      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: [
+              `${images.length} of ${images.length + errors.length} images generated.`,
+              ...images.map(imageLines),
+              ...failed,
+              ...warnings.map((warning) => `warning: ${warning}`),
+            ].join('\n'),
+          },
+        ],
+        ...(images.length === 0 && { isError: true }),
+      };
+    } catch (error) {
+      return toErrorResult(error);
+    }
+  };
+}
+
 async function buildImageResult(
   image: GeneratedImage,
   inspect: boolean,
@@ -67,8 +103,11 @@ async function buildImageResult(
 }
 
 function formatImage(image: GeneratedImage): string {
+  return ['Image generated successfully.', imageLines(image)].join('\n');
+}
+
+function imageLines(image: GeneratedImage): string {
   return [
-    'Image generated successfully.',
     `id: ${image.id}`,
     `url: ${image.imageUrl}`,
     ...(image.warnings ?? []).map((warning) => `warning: ${warning}`),

@@ -95,7 +95,7 @@ export function createHttpApp({
   app.post('/mcp', express.json({ limit: '2mb' }), async (req, res) => {
     // Set by requireBearerAuth above; its type augmentation targets the SDK's own express types.
     const { extra } = (req as typeof req & { auth: AuthInfo }).auth;
-    const server = createServer(new OjoApiClient(extra!.apiKey as string, apiBaseUrl), webBaseUrl);
+    const server = createServer(new OjoApiClient(extra!.apiKey as string, apiBaseUrl, { remote: true }), webBaseUrl);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on('close', () => {
       void transport.close();

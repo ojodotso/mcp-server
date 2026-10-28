@@ -1,5 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { createServer } from '../../src/server/index.js';
 import { OjoApiClient, OjoApiError } from '../../src/server/ojo-client.js';
+
+/** Call a tool through the MCP server on a real client, so a test pins the request that reaches
+ * fetch rather than the client's method signature, which no criterion fixes. */
+async function callTool(apiClient: OjoApiClient, name: string, args: Record<string, unknown>) {
+  const server = createServer(apiClient);
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: 'test-client', version: '0.0.0' });
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  try {
+    return (await client.callTool({ name, arguments: args })) as {
+      content: { type: string; text?: string }[];
+      isError?: boolean;
+    };
+  } finally {
+    await client.close();
+  }
+}
 
 function jsonResponse(body: unknown, init: { status?: number } = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -203,28 +223,36 @@ describe('OjoApiClient', () => {
     );
     const client = new OjoApiClient('k', 'https://api.example/v1');
 
-    const result = await client.createTemplate('<h1>{{title}}</h1>', {
-      title: 'Hi',
+    const result = await callTool(client, 'create_template', {
+      html: '<h1>{{title}}</h1>',
+      variables: { title: 'Hi' },
     });
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]![0]).toBe('https://api.example/v1/template');
     const init = callInit(fetchMock);
     expect(init.method).toBe('POST');
     const body = JSON.parse(init.body!);
     expect(body.html).toBe('<h1>{{title}}</h1>');
     expect(body.variables).toEqual({ title: 'Hi' });
-    expect(result).toEqual({ id: 'tpl_new', message: 'Template created' });
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(result.content[0]?.text ?? '')).toEqual({
+      id: 'tpl_new',
+      message: 'Template created',
+    });
   });
 
-  it('AC725 sends the html plain when updating a template', async () => {
+  it('AC725 sends the html plain when updating a template, and only the fields given', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse({ id: 'tpl_1', message: 'Template updated' })
     );
     const client = new OjoApiClient('k', 'https://api.example/v1');
     const html = '<p class="a">Grüße "{{name}}"\n✓</p>';
 
-    await client.updateTemplate('tpl_1', html);
+    await callTool(client, 'update_template', { templateId: 'tpl_1', html });
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]![0]).toBe('https://api.example/v1/template/tpl_1');
     const init = callInit(fetchMock);
     expect(init.method).toBe('PUT');
     expect(JSON.parse(init.body!)).toEqual({ html });

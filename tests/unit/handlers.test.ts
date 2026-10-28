@@ -2,8 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { gunzipSync } from 'node:zlib';
 import { randomBytes } from 'node:crypto';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import type { OjoApiClient } from '../../src/server/ojo-client.js';
-import { OjoApiError } from '../../src/server/ojo-client.js';
+import { OjoApiClient, OjoApiError } from '../../src/server/ojo-client.js';
 import {
   makeGenerateImageFromHtml,
   makeGenerateImageFromTemplate,
@@ -238,21 +237,36 @@ describe('template handlers', () => {
     expect(JSON.parse(firstText(result)).html).toBe('<h1>hi</h1>');
   });
 
-  it('passes html and variables to createTemplate', async () => {
-    const createTemplate = vi
-      .fn()
-      .mockResolvedValue({ id: 'tpl_new', message: 'Template created' });
-    const handler = makeCreateTemplate(fakeClient({ createTemplate }));
+  // Asserted on the request that reaches fetch, not on the client's call shape, which no
+  // criterion fixes (2026-10-26 MCP API parity spec, Q2).
+  it('sends html and variables to POST /template and returns the JSON as text', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: 'tpl_new', message: 'Template created' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const handler = makeCreateTemplate(new OjoApiClient('k', 'https://api.example/v1'));
 
-    const result = await handler({
-      html: '<h1>{{title}}</h1>',
-      variables: { title: 'Hi' },
-    });
+      const result = await handler({
+        html: '<h1>{{title}}</h1>',
+        variables: { title: 'Hi' },
+      });
 
-    expect(createTemplate).toHaveBeenCalledWith('<h1>{{title}}</h1>', {
-      title: 'Hi',
-    });
-    expect(JSON.parse(firstText(result)).id).toBe('tpl_new');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0]! as [string, { method?: string; body?: string }];
+      expect(url).toBe('https://api.example/v1/template');
+      expect(init.method).toBe('POST');
+      expect(JSON.parse(init.body!)).toEqual({
+        html: '<h1>{{title}}</h1>',
+        variables: { title: 'Hi' },
+      });
+      expect(JSON.parse(firstText(result)).id).toBe('tpl_new');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('returns an isError result when getTemplate throws', async () => {

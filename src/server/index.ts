@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { OjoApiClient } from './ojo-client.js';
-import { OJO_WEB_BASE_URL } from '../constants.js';
+import { OJO_WEB_BASE_URL, VERSION } from '../constants.js';
 import { registerTools } from '../tools/index.js';
 import { registerPrompts } from '../prompts/index.js';
 
@@ -17,9 +17,8 @@ export function createServer(
 ): McpServer {
   const server = new McpServer({
     name: 'ojo',
-    // Keep in sync with package.json — this is what clients see in the MCP
-    // handshake. It drifted to a stale 0.1.0 once; bump both together.
-    version: '0.8.0',
+    // What clients see in the MCP handshake. It drifted to a stale 0.1.0 once.
+    version: VERSION,
   });
   registerTools(server, client, webBaseUrl);
   registerPrompts(server, client !== null);

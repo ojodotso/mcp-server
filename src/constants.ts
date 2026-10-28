@@ -11,3 +11,8 @@ export const HEADER_VIEWPORT_WIDTH = 'x-viewport-width';
 export const HEADER_VIEWPORT_HEIGHT = 'x-viewport-height';
 export const HEADER_TRANSPARENT_BACKGROUND = 'x-transparent-background';
 export const HEADER_SOURCE = 'x-ojo-source';
+
+// Keep in sync with package.json. Sent in the MCP handshake and, as x-ojo-client-version, with
+// every API request so the server can tell old copies apart in its logs (AC1440).
+export const VERSION = '0.9.0';
+export const HEADER_CLIENT_VERSION = 'x-ojo-client-version';

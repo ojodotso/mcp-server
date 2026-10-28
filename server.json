@@ -3,7 +3,7 @@
   "name": "so.ojo/mcp-server",
   "title": "oJo — HTML to image and PDF",
   "description": "Fill an HTML template with JSON and get a hosted PDF or image link. Free previews, no key.",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "websiteUrl": "https://ojo.so/docs/mcp-server",
   "repository": {
     "url": "https://github.com/ojodotso/mcp-server",
@@ -20,7 +20,7 @@
     {
       "registryType": "npm",
       "identifier": "@ojodotso/mcp-server",
-      "version": "0.8.0",
+      "version": "0.9.0",
       "transport": {
         "type": "stdio"
       },
